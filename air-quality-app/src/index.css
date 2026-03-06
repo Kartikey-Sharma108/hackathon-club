@@ -3,11 +3,15 @@
 @tailwind utilities;
 
 /* ── Global Reset ─────────────────────────────── */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   width: 100%;
   margin: 0;
@@ -28,7 +32,7 @@ html, body, #root {
   backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.08) !important;
   border-radius: 16px !important;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255,255,255,0.05) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.05) !important;
   color: #e2e8f0 !important;
   padding: 0 !important;
   overflow: hidden;
@@ -54,7 +58,7 @@ html, body, #root {
 
 .leaflet-popup-close-button:hover {
   color: #fff !important;
-  background: rgba(255,255,255,0.1) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
 }
 
 /* Cluster marker styles */
@@ -73,10 +77,22 @@ html, body, #root {
 }
 
 /* ── Custom Scrollbar ─────────────────────────── */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
 
 /* ── Glass Utility  ───────────────────────────── */
 .glass {
@@ -88,8 +104,17 @@ html, body, #root {
 
 /* ── Pulse Animation for live badge ──────────── */
 @keyframes pulse-glow {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50%       { opacity: 0.6; transform: scale(1.2); }
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
+  }
 }
 
 .live-dot {
@@ -98,8 +123,15 @@ html, body, #root {
 
 /* ── Fade-In Animation ────────────────────────── */
 @keyframes fadeSlideIn {
-  from { opacity: 0; transform: translateY(-8px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-fade-in {
@@ -108,8 +140,15 @@ html, body, #root {
 
 /* ── AQI Circle Marker pulse ──────────────────── */
 @keyframes aqi-ping {
-  0%   { transform: scale(1); opacity: 0.6; }
-  100% { transform: scale(2); opacity: 0; }
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
 }
 
 .aqi-pulse::after {
@@ -118,4 +157,188 @@ html, body, #root {
   inset: 0;
   border-radius: 50%;
   animation: aqi-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* ── Health Risk Meter ───────────────────────── */
+.health-risk-meter {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.3s ease;
+}
+
+.health-risk-meter:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+/* ── Health Profile Form ─────────────────────── */
+.health-profile-form {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.health-profile-card {
+  cursor: pointer;
+}
+
+.health-profile-card:active {
+  transform: scale(0.98);
+}
+
+/* ── Backdrop Animation ──────────────────────── */
+@keyframes backdropFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.backdrop-blur-sm {
+  animation: backdropFadeIn 0.2s ease-out forwards;
+}
+
+/* ── Sidebar Navigation ──────────────────────── */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 52px;
+  height: 100vh;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  background: rgba(8, 12, 24, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
+}
+
+.sidebar__brand {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.sidebar__item {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.sidebar__item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: scale(1.05);
+}
+
+.sidebar__item:active {
+  transform: scale(0.95);
+}
+
+.sidebar__item--active {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sidebar__indicator {
+  position: absolute;
+  left: -6px;
+  width: 3px;
+  height: 20px;
+  border-radius: 0 3px 3px 0;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sidebar__icon {
+  color: #64748b;
+  transition: color 0.2s;
+  position: relative;
+  z-index: 1;
+}
+
+.sidebar__item:hover .sidebar__icon {
+  color: #94a3b8;
+}
+
+.sidebar__item--active .sidebar__icon {
+  color: inherit;
+}
+
+/* Tooltip on hover */
+.sidebar__tooltip {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: rgba(10, 15, 30, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+  transform: translateY(-50%) translateX(-4px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.sidebar__item:hover .sidebar__tooltip {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+/* ── Layout with sidebar ─────────────────────── */
+.app-layout {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-layout__content {
+  flex: 1;
+  position: relative;
+  margin-left: 52px;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── View transition ─────────────────────────── */
+@keyframes viewSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.view-enter {
+  animation: viewSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

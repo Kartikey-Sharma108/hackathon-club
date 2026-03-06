@@ -3,29 +3,32 @@
  *
  * Features:
  * - Full-screen dark-themed Leaflet map (CartoDB Dark Matter tiles)
- * - Initializes at the user's geolocation (falls back to World center)
- * - Renders all fetched stations as CircleMarkers via StationMarker
+ * - Sidebar navigation between Map / Routes / Health views
+ * - Map view: clean map with AQI stations + search + legend
+ * - Routes view: Healthiest Commute routing panel + route comparison
+ * - Health view: Health Risk Meter + profile-specific recommendations
  * - AutoRefresh every 5 minutes with live countdown
  * - Custom dark ZoomControls + LocateMe button
- * - 🚀 Healthiest Commute routing with IDW AQI scoring
- * - Overlays: InfoPanel, SearchBar, Legend, RoutingPanel, RouteComparison
- * - Loading overlay on active fetch
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { MapContainer, TileLayer } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 
 import { useAirQuality } from '../../hooks/useAirQuality'
+import { useHealthProfile } from '../../hooks/useHealthProfile'
 import MapController from './MapController'
 import StationMarker from './StationMarker'
 import AutoRefresh from './AutoRefresh'
 import ZoomControls from './ZoomControls'
 import LocateButton from './LocateButton'
+import Sidebar from '../UI/Sidebar'
 import SearchBar from '../UI/SearchBar'
 import Legend from '../UI/Legend'
 import InfoPanel from '../UI/InfoPanel'
 import LoadingOverlay from '../UI/LoadingOverlay'
+import HealthRiskMeter from '../Health/HealthRiskMeter'
+import UserProfileForm from '../Health/UserProfileForm'
 import { useHealthyRouting } from '../../hooks/useHealthyRouting'
 import RoutingEngine from '../Routing/RoutingEngine'
 import RoutingPanel from '../Routing/RoutingPanel'
@@ -42,8 +45,11 @@ export default function AirQualityMap() {
     const [geoReady, setGeoReady] = useState(false)
     const [flyTarget, setFlyTarget] = useState(null)
     const [secondsLeft, setSecondsLeft] = useState(REFRESH_SECS)
-    const [refreshTick, setRefreshTick] = useState(0)   // bump to force refresh
+    const [refreshTick, setRefreshTick] = useState(0)
     const hasInit = useRef(false)
+
+    // ── Active view (sidebar navigation) ─────────────────────────────────────
+    const [activeView, setActiveView] = useState('map') // 'map' | 'routing' | 'health'
 
     const {
         stations,
@@ -58,6 +64,24 @@ export default function AirQualityMap() {
         search,
         clearSearch,
     } = useAirQuality()
+
+    // ── Compute nearest station AQI for health system ────────────────────────
+    const nearestAqi = useMemo(() => {
+        if (!stations.length || !center) return null
+        let closest = null
+        let minDist = Infinity
+        for (const s of stations) {
+            const d = Math.hypot(s.lat - center[0], s.lon - center[1])
+            if (d < minDist) {
+                minDist = d
+                closest = s
+            }
+        }
+        return closest ? Number(closest.aqi) : null
+    }, [stations, center])
+
+    // ── Health Profile Integration ───────────────────────────────────────────
+    const health = useHealthProfile(nearestAqi)
 
     // ── Healthy Routing ──────────────────────────────────────────────────────
     const routing = useHealthyRouting(stations)
@@ -90,7 +114,6 @@ export default function AirQualityMap() {
         const tick = setInterval(() => {
             setSecondsLeft((s) => {
                 if (s <= 1) {
-                    // Trigger a bounds re-fetch by bumping the refresh tick
                     setRefreshTick((t) => t + 1)
                     return REFRESH_SECS
                 }
@@ -112,6 +135,11 @@ export default function AirQualityMap() {
         if (result.uid) selectStation(result)
     }, [selectStation])
 
+    // ── View change handler ──────────────────────────────────────────────────
+    const handleViewChange = useCallback((viewId) => {
+        setActiveView(viewId)
+    }, [])
+
     // ── Tile layer ───────────────────────────────────────────────────────────
     const tileUrl = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
     const tileAttribution = '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
@@ -128,142 +156,202 @@ export default function AirQualityMap() {
     }
 
     return (
-        <div className="relative w-full h-screen overflow-hidden">
+        <div className="app-layout">
+            {/* ── Sidebar Navigation ──────────────────────────────────────── */}
+            <Sidebar activeView={activeView} onChangeView={handleViewChange} />
 
-            {/* ── Leaflet Map ──────────────────────────────────────────────────── */}
-            <MapContainer
-                center={center}
-                zoom={zoom}
-                style={{ width: '100%', height: '100%' }}
-                zoomControl={false}
-                attributionControl={false}
-            >
-                {/* Dark CartoDB tile layer */}
-                <TileLayer url={tileUrl} attribution={tileAttribution} maxZoom={18} />
+            {/* ── Main Content Area ───────────────────────────────────────── */}
+            <div className="app-layout__content">
 
-                {/* Imperative controller: bounds fetch + flyTo */}
-                <MapController
-                    onBoundsChange={loadStationsForBounds}
-                    flyTarget={flyTarget}
-                    refreshTick={refreshTick}
-                />
+                {/* ── Leaflet Map (always visible) ────────────────────────── */}
+                <MapContainer
+                    center={center}
+                    zoom={zoom}
+                    style={{ width: '100%', height: '100%' }}
+                    zoomControl={false}
+                    attributionControl={false}
+                >
+                    <TileLayer url={tileUrl} attribution={tileAttribution} maxZoom={18} />
 
-                {/* Auto-refresh logic (invisible) */}
-                <AutoRefresh onRefresh={loadStationsForBounds} />
-
-                {/* Custom zoom controls (inside MapContainer so useMap() works) */}
-                <ZoomControlsOverlay />
-
-                {/* Locate Me button (inside MapContainer so useMap() works) */}
-                <LocateOverlay />
-
-                {/* Station markers */}
-                {stations.map((station) => (
-                    <StationMarker
-                        key={station.uid}
-                        station={station}
-                        onSelect={selectStation}
-                        selectedStation={selectedStation}
+                    <MapController
+                        onBoundsChange={loadStationsForBounds}
+                        flyTarget={flyTarget}
+                        refreshTick={refreshTick}
                     />
-                ))}
 
-                {/* Routing engine (inside MapContainer for useMap access) */}
-                <RoutingEngine
-                    source={routing.source}
-                    destination={routing.destination}
-                    isCalculating={routing.isCalculating}
-                    setIsCalculating={routing.setIsCalculating}
-                    processAlternatives={routing.processAlternatives}
-                    setRouteError={routing.setRouteError}
-                    shortestRoute={routing.shortestRoute}
-                    healthiestRoute={routing.healthiestRoute}
-                    isSameRoute={routing.isSameRoute}
-                    pickingMode={routing.pickingMode}
-                    setWaypoint={routing.setWaypoint}
-                />
-            </MapContainer>
+                    <AutoRefresh onRefresh={loadStationsForBounds} />
+                    <ZoomControlsOverlay />
+                    <LocateOverlay />
 
-            {/* ── Overlays (outside MapContainer, positioned absolute) ──────── */}
+                    {/* Station markers */}
+                    {stations.map((station) => (
+                        <StationMarker
+                            key={station.uid}
+                            station={station}
+                            onSelect={selectStation}
+                            selectedStation={selectedStation}
+                        />
+                    ))}
 
-            {/* Loading spinner */}
-            {isLoading && <LoadingOverlay message="Fetching station data…" />}
-
-            {/* Top-left: brand + live status + refresh countdown */}
-            <div className="absolute top-4 left-4 z-[800]">
-                <InfoPanel
-                    stationCount={stations.length}
-                    isLoading={isLoading}
-                    error={error}
-                    secondsUntilRefresh={secondsLeft}
-                    onManualRefresh={handleManualRefresh}
-                />
-            </div>
-
-            {/* Top-right: search bar */}
-            <div className="absolute top-4 right-4 z-[800] w-72">
-                <SearchBar
-                    onSearch={search}
-                    searchResults={searchResults}
-                    isSearching={isSearching}
-                    onSelectResult={handleSelectResult}
-                    onClear={clearSearch}
-                />
-            </div>
-
-            {/* Left panel: Routing input (below InfoPanel) */}
-            <div className="absolute top-[72px] left-4 z-[800]">
-                <RoutingPanel
-                    panelOpen={routing.panelOpen}
-                    togglePanel={routing.togglePanel}
-                    source={routing.source}
-                    destination={routing.destination}
-                    pickingMode={routing.pickingMode}
-                    startPicking={routing.startPicking}
-                    cancelPicking={routing.cancelPicking}
-                    clearRoutes={routing.clearRoutes}
-                    isCalculating={routing.isCalculating}
-                    calculate={routing.calculate}
-                    routeError={routing.routeError}
-                    onSwapPoints={routing.swapPoints}
-                    hasResults={!!(routing.shortestRoute || routing.healthiestRoute)}
-                />
-            </div>
-
-            {/* Route comparison card (below routing panel, left side) */}
-            {(routing.shortestRoute || routing.healthiestRoute) && (
-                <div className="absolute top-[72px] right-4 z-[800] mt-12">
-                    <RouteComparison
+                    {/* Routing engine (always mounted for polylines + picking) */}
+                    <RoutingEngine
+                        source={routing.source}
+                        destination={routing.destination}
+                        isCalculating={routing.isCalculating}
+                        setIsCalculating={routing.setIsCalculating}
+                        processAlternatives={routing.processAlternatives}
+                        setRouteError={routing.setRouteError}
                         shortestRoute={routing.shortestRoute}
                         healthiestRoute={routing.healthiestRoute}
                         isSameRoute={routing.isSameRoute}
-                        onClose={routing.clearRoutes}
+                        pickingMode={routing.pickingMode}
+                        setWaypoint={routing.setWaypoint}
+                    />
+                </MapContainer>
+
+                {/* ── Shared Overlays (always visible) ────────────────────── */}
+
+                {/* Loading spinner */}
+                {isLoading && <LoadingOverlay message="Fetching station data…" />}
+
+                {/* Top-left: brand + live status */}
+                <div className="absolute top-4 left-4 z-[800]">
+                    <InfoPanel
+                        stationCount={stations.length}
+                        isLoading={isLoading}
+                        error={error}
+                        secondsUntilRefresh={secondsLeft}
+                        onManualRefresh={handleManualRefresh}
                     />
                 </div>
-            )}
 
-            {/* Bottom-left: AQI legend */}
-            <div className="absolute bottom-6 left-4 z-[800]">
-                <Legend />
-            </div>
+                {/* Top-right: search bar */}
+                <div className="absolute top-4 right-4 z-[800] w-72">
+                    <SearchBar
+                        onSearch={search}
+                        searchResults={searchResults}
+                        isSearching={isSearching}
+                        onSelectResult={handleSelectResult}
+                        onClear={clearSearch}
+                    />
+                </div>
 
-            {/* Bottom-right: attribution */}
-            <div className="absolute bottom-2 right-3 z-[800]">
-                <p className="text-[10px] text-slate-600">
-                    Data:{' '}
-                    <a href="https://waqi.info" target="_blank" rel="noreferrer" className="hover:text-slate-400 transition-colors">WAQI</a>
-                    {' · '}
-                    Tiles:{' '}
-                    <a href="https://carto.com" target="_blank" rel="noreferrer" className="hover:text-slate-400 transition-colors">CARTO</a>
-                </p>
+                {/* ═══════════════════════════════════════════════════════════
+                    VIEW: MAP — Clean map with AQI Legend
+                   ═══════════════════════════════════════════════════════════ */}
+                {activeView === 'map' && (
+                    <div className="view-enter absolute inset-0 z-[900] pointer-events-none [&>*]:pointer-events-auto">
+                        {/* Bottom-left: AQI legend */}
+                        <div className="absolute bottom-6 left-4 z-[800]">
+                            <Legend />
+                        </div>
+                    </div>
+                )}
+
+                {/* ═══════════════════════════════════════════════════════════
+                    VIEW: ROUTING — Routing panel + Route comparison
+                   ═══════════════════════════════════════════════════════════ */}
+                {activeView === 'routing' && (
+                    <div className="view-enter absolute inset-0 z-[900] pointer-events-none [&>*]:pointer-events-auto" key="view-routing">
+                        {/* Left panel: Routing input (below InfoPanel) */}
+                        <div className="absolute top-[72px] left-4 z-[800]">
+                            <RoutingPanel
+                                panelOpen={true}
+                                togglePanel={routing.togglePanel}
+                                source={routing.source}
+                                destination={routing.destination}
+                                pickingMode={routing.pickingMode}
+                                startPicking={routing.startPicking}
+                                cancelPicking={routing.cancelPicking}
+                                clearRoutes={routing.clearRoutes}
+                                isCalculating={routing.isCalculating}
+                                calculate={routing.calculate}
+                                routeError={routing.routeError}
+                                onSwapPoints={routing.swapPoints}
+                                hasResults={!!(routing.shortestRoute || routing.healthiestRoute)}
+                            />
+                        </div>
+
+                        {/* Right panel: Route comparison results */}
+                        {(routing.shortestRoute || routing.healthiestRoute) && (
+                            <div className="absolute top-[72px] right-4 z-[800] mt-12">
+                                <RouteComparison
+                                    shortestRoute={routing.shortestRoute}
+                                    healthiestRoute={routing.healthiestRoute}
+                                    isSameRoute={routing.isSameRoute}
+                                    onClose={routing.clearRoutes}
+                                />
+                            </div>
+                        )}
+
+                        {/* Bottom-left: AQI legend (also useful during routing) */}
+                        <div className="absolute bottom-6 left-4 z-[800]">
+                            <Legend />
+                        </div>
+                    </div>
+                )}
+
+                {/* ═══════════════════════════════════════════════════════════
+                    VIEW: HEALTH — Health Risk Meter + Profile selector
+                   ═══════════════════════════════════════════════════════════ */}
+                {activeView === 'health' && (
+                    <div className="view-enter absolute inset-0 z-[900] pointer-events-none [&>*]:pointer-events-auto" key="view-health">
+                        {/* Health Risk Meter — right side, vertically centered */}
+                        <div className="absolute top-[72px] right-4 z-[800] w-[300px]">
+                            <HealthRiskMeter
+                                strain={health.strain}
+                                recommendation={health.recommendation}
+                                profile={health.profile}
+                                currentAqi={health.currentAqi}
+                                onOpenProfileForm={health.togglePanel}
+                            />
+                        </div>
+
+                        {/* Bottom-left: AQI legend */}
+                        <div className="absolute bottom-6 left-4 z-[800]">
+                            <Legend />
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Health Profile Form (modal overlay — any view) ───────── */}
+                {health.panelOpen && (
+                    <div className="absolute inset-0 z-[900] flex items-center justify-center">
+                        <div
+                            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+                            onClick={health.closePanel}
+                        />
+                        <div className="relative z-10 w-[340px] glass rounded-2xl shadow-2xl">
+                            <UserProfileForm
+                                profiles={health.profiles}
+                                selectedProfileId={health.profileId}
+                                onSelectProfile={(id) => {
+                                    health.selectProfile(id)
+                                    health.closePanel()
+                                }}
+                                onClose={health.closePanel}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Bottom-right: attribution */}
+                <div className="absolute bottom-2 right-3 z-[800]">
+                    <p className="text-[10px] text-slate-600">
+                        Data:{' '}
+                        <a href="https://waqi.info" target="_blank" rel="noreferrer" className="hover:text-slate-400 transition-colors">WAQI</a>
+                        {' · '}
+                        Tiles:{' '}
+                        <a href="https://carto.com" target="_blank" rel="noreferrer" className="hover:text-slate-400 transition-colors">CARTO</a>
+                    </p>
+                </div>
             </div>
         </div>
     )
 }
 
 /**
- * ZoomControlsOverlay — wraps ZoomControls in a Leaflet-portal div
- * positioned at the right side of the map (needs useMap, so must be
- * rendered inside <MapContainer>).
+ * ZoomControlsOverlay — wraps ZoomControls in a Leaflet-portal div.
  */
 function ZoomControlsOverlay() {
     return (
